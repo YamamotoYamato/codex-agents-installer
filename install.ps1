@@ -55,7 +55,8 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host '---'
 
     if ($existingContent.Contains($sourceContent)) {
-        throw "Abort: latest AGENTS.md version is already included in $destination."
+        Write-Host "Skipped: latest AGENTS.md version is already included in $destination."
+        exit 0
     }
 
     $matchedVersion = $null

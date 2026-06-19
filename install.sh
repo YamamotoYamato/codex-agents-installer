@@ -109,8 +109,8 @@ if [ -f "$destination" ]; then
         exit(($source ne "" && index($existing, $source) >= 0) ? 0 : 1);
     ' "$destination" "$source_file"
     then
-        echo "Abort: latest AGENTS.md version is already included in $destination." >&2
-        exit 1
+        echo "Skipped: latest AGENTS.md version is already included in $destination."
+        exit 0
     fi
 
     matched_file=
