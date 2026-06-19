@@ -99,25 +99,13 @@ if [ -f "$destination" ]; then
     cat "$destination"
     echo "---"
 
-    if perl -0e '
-        my ($destination, $source_file) = @ARGV;
-        open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
-        open my $source_fh, "<:encoding(UTF-8)", $source_file or die $!;
-        local $/;
-        my $existing = <$existing_fh>;
-        my $source = <$source_fh>;
-        exit(($source ne "" && index($existing, $source) >= 0) ? 0 : 1);
-    ' "$destination" "$source_file"
-    then
-        echo "Skipped: latest AGENTS.md version is already included in $destination."
-        exit 0
-    fi
-
     matched_file=
     if [ -d "$version_dir" ]; then
-        for version_file in "$version_dir"/*.md; do
+        for version_file in $(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
+            sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
+            sort -rn |
+            awk '{ print $2 }'); do
             [ -f "$version_file" ] || continue
-            [ "$version_file" != "$source_file" ] || continue
             if perl -0e '
                 my ($destination, $version_file) = @ARGV;
                 open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
@@ -132,6 +120,10 @@ if [ -f "$destination" ]; then
                 break
             fi
         done
+    fi
+    if [ "$matched_file" = "$source_file" ]; then
+        echo "Skipped: latest AGENTS.md version is already included in $destination."
+        exit 0
     fi
     if [ -n "$matched_file" ]; then
         echo "Current version: $(basename "$matched_file")"

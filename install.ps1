@@ -54,24 +54,22 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host $existingContent
     Write-Host '---'
 
-    if ($existingContent.Contains($sourceContent)) {
-        Write-Host "Skipped: latest AGENTS.md version is already included in $destination."
-        exit 0
-    }
-
     $matchedVersion = $null
     $matchedContent = $null
-    $previousVersionFiles = @()
-    if ($versionFiles.Count -gt 1) {
-        $previousVersionFiles = @($versionFiles | Select-Object -First ($versionFiles.Count - 1))
-    }
-    foreach ($versionFile in $previousVersionFiles) {
+    $matchedPath = $null
+    foreach ($versionFile in @($versionFiles | Sort-Object { [int]$_.BaseName } -Descending)) {
         $versionContent = [System.IO.File]::ReadAllText($versionFile.FullName, $utf8)
         if ($versionContent -and $existingContent.Contains($versionContent)) {
             $matchedVersion = $versionFile.Name
             $matchedContent = $versionContent
+            $matchedPath = $versionFile.FullName
             break
         }
+    }
+
+    if ($matchedPath -eq $source) {
+        Write-Host "Skipped: latest AGENTS.md version is already included in $destination."
+        exit 0
     }
     if ($matchedVersion) {
         Write-Host "Current version: $matchedVersion"
