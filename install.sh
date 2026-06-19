@@ -2,6 +2,12 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+if [ "${CODEX_AGENTS_SKIP_UPDATE:-}" != "1" ] && [ -d "$script_dir/.git" ] && command -v git >/dev/null 2>&1; then
+    echo "最新版を取得しています..."
+    git -C "$script_dir" pull --ff-only
+fi
+
 version_dir="$script_dir/versions"
 source_file=$(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
     sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
@@ -168,7 +174,7 @@ if [ -f "$destination" ]; then
     else
         action=${CODEX_AGENTS_ACTION:-}
         if [ -z "$action" ]; then
-            printf '既知のバージョンに一致しません。操作を選択してください（[O] 上書き / [a] 追記）: '
+            printf '既知のバージョンに一致しません。操作を選択してください ([O] 上書き / [a] 追記): '
             read -r action
         fi
         if [ -z "$action" ]; then
