@@ -66,7 +66,7 @@ if [ -f "$destination" ]; then
     fi
 
     case "$save" in
-        y|yes)
+        y|Y|yes|YES)
             ;;
         *)
             echo "Skipped: $destination"
@@ -84,11 +84,11 @@ if [ -f "$destination" ]; then
     fi
 
     case "$action" in
-        o|overwrite)
+        o|O|overwrite|OVERWRITE)
             cp "$source_file" "$destination"
             echo "Overwritten: $destination"
             ;;
-        a|append)
+        a|A|append|APPEND)
             printf '\n\n' >> "$destination"
             cat "$source_file" >> "$destination"
             echo "Appended: $destination"
