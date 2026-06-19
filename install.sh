@@ -3,6 +3,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 source_file="$script_dir/AGENTS.md"
+version_dir="$script_dir/versions"
 home_dir=${CODEX_AGENTS_HOME:-$HOME}
 if [ -n "${CODEX_HOME:-}" ] && [ -d "$CODEX_HOME" ]; then
     default_target=$CODEX_HOME
@@ -95,6 +96,29 @@ if [ -f "$destination" ]; then
     cat "$destination"
     echo "---"
 
+    matched_file=
+    if [ -d "$version_dir" ]; then
+        for version_file in "$version_dir"/*.md; do
+            [ -f "$version_file" ] || continue
+            if perl -0e '
+                my ($destination, $version_file) = @ARGV;
+                open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
+                open my $version_fh, "<:encoding(UTF-8)", $version_file or die $!;
+                local $/;
+                my $existing = <$existing_fh>;
+                my $version = <$version_fh>;
+                exit(($version ne "" && index($existing, $version) >= 0) ? 0 : 1);
+            ' "$destination" "$version_file"
+            then
+                matched_file=$version_file
+                break
+            fi
+        done
+    fi
+    if [ -n "$matched_file" ]; then
+        echo "Matched previous version: $(basename "$matched_file")"
+    fi
+
     save=${CODEX_AGENTS_SAVE:-}
     if [ -z "$save" ]; then
         printf 'Save changes? [y/N]: '
@@ -112,14 +136,42 @@ if [ -f "$destination" ]; then
 
     action=${CODEX_AGENTS_ACTION:-}
     if [ -z "$action" ]; then
-        printf 'Action ([O]verwrite / [a]ppend): '
+        if [ -n "$matched_file" ]; then
+            printf 'Action ([r]eplace matched / [O]verwrite / [a]ppend): '
+        else
+            printf 'Action ([O]verwrite / [a]ppend): '
+        fi
         read -r action
     fi
     if [ -z "$action" ]; then
-        action=overwrite
+        if [ -n "$matched_file" ]; then
+            action=replace
+        else
+            action=overwrite
+        fi
     fi
 
     case "$action" in
+        r|R|replace|REPLACE)
+            if [ -z "$matched_file" ]; then
+                echo "No previous AGENTS.md version matched in $destination." >&2
+                exit 1
+            fi
+            perl -e '
+                my ($destination, $matched_file, $source_file) = @ARGV;
+                local $/;
+                open my $destination_fh, "<:encoding(UTF-8)", $destination or die $!;
+                open my $old_fh, "<:encoding(UTF-8)", $matched_file or die $!;
+                open my $new_fh, "<:encoding(UTF-8)", $source_file or die $!;
+                my $existing = <$destination_fh>;
+                my $old = <$old_fh>;
+                my $new = <$new_fh>;
+                $existing =~ s/\Q$old\E/$new/g;
+                open my $out_fh, ">:encoding(UTF-8)", $destination or die $!;
+                print {$out_fh} $existing;
+            ' "$destination" "$matched_file" "$source_file"
+            echo "Replaced matched version: $destination"
+            ;;
         o|O|overwrite|OVERWRITE)
             cp "$source_file" "$destination"
             echo "Overwritten: $destination"

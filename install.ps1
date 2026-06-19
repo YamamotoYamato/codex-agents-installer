@@ -42,6 +42,7 @@ New-Item -ItemType Directory -Force -Path $target | Out-Null
 $destination = Join-Path $target 'AGENTS.md'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $sourceContent = [System.IO.File]::ReadAllText($source, $utf8)
+$versionDir = Join-Path $PSScriptRoot 'versions'
 
 if (Test-Path -LiteralPath $destination) {
     $existingContent = [System.IO.File]::ReadAllText($destination, $utf8)
@@ -50,17 +51,43 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host $existingContent
     Write-Host '---'
 
+    $matchedVersion = $null
+    $matchedContent = $null
+    if (Test-Path -LiteralPath $versionDir -PathType Container) {
+        $versionFiles = @(Get-ChildItem -LiteralPath $versionDir -File -Filter '*.md' | Sort-Object Name)
+        foreach ($versionFile in $versionFiles) {
+            $versionContent = [System.IO.File]::ReadAllText($versionFile.FullName, $utf8)
+            if ($versionContent -and $existingContent.Contains($versionContent)) {
+                $matchedVersion = $versionFile.Name
+                $matchedContent = $versionContent
+                break
+            }
+        }
+    }
+    if ($matchedVersion) {
+        Write-Host "Matched previous version: $matchedVersion"
+    }
+
     $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Save changes? [y/N]' }
     if (-not $save -or $save.ToLowerInvariant() -notin @('y', 'yes')) {
         Write-Host "Skipped: $destination"
         exit 0
     }
 
-    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'Action ([O]verwrite / [a]ppend)' }
+    $actionPrompt = if ($matchedContent) { 'Action ([r]eplace matched / [O]verwrite / [a]ppend)' } else { 'Action ([O]verwrite / [a]ppend)' }
+    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host $actionPrompt }
     if (-not $action) {
-        $action = 'overwrite'
+        $action = if ($matchedContent) { 'replace' } else { 'overwrite' }
     }
     switch ($action.ToLowerInvariant()) {
+        { $_ -in @('r', 'replace') } {
+            if (-not $matchedContent) {
+                throw "No previous AGENTS.md version matched in $destination."
+            }
+            $updatedContent = $existingContent.Replace($matchedContent, $sourceContent)
+            [System.IO.File]::WriteAllText($destination, $updatedContent, $utf8)
+            Write-Host "Replaced matched version: $destination"
+        }
         { $_ -in @('o', 'overwrite') } {
             Copy-Item -LiteralPath $source -Destination $destination -Force
             Write-Host "Overwritten: $destination"
