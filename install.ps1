@@ -89,8 +89,23 @@ if (Test-Path -LiteralPath $destination) {
         [System.IO.File]::WriteAllText($destination, $updatedContent, $utf8)
         Write-Host "Replaced matched version: $destination"
     } else {
-        [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
-        Write-Host "Appended: $destination"
+        $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'No known version matched. Action ([O]verwrite / [a]ppend)' }
+        if (-not $action) {
+            $action = 'overwrite'
+        }
+        switch ($action.ToLowerInvariant()) {
+            { $_ -in @('o', 'overwrite') } {
+                [System.IO.File]::WriteAllText($destination, $sourceContent, $utf8)
+                Write-Host "Overwritten: $destination"
+            }
+            { $_ -in @('a', 'append') } {
+                [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
+                Write-Host "Appended: $destination"
+            }
+            default {
+                throw "Invalid action: $action"
+            }
+        }
     }
 } else {
     Copy-Item -LiteralPath $source -Destination $destination

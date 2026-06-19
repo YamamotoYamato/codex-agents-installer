@@ -166,9 +166,30 @@ if [ -f "$destination" ]; then
         ' "$destination" "$matched_file" "$source_file"
         echo "Replaced matched version: $destination"
     else
-        printf '\n\n' >> "$destination"
-        cat "$source_file" >> "$destination"
-        echo "Appended: $destination"
+        action=${CODEX_AGENTS_ACTION:-}
+        if [ -z "$action" ]; then
+            printf 'No known version matched. Action ([O]verwrite / [a]ppend): '
+            read -r action
+        fi
+        if [ -z "$action" ]; then
+            action=overwrite
+        fi
+
+        case "$action" in
+            o|O|overwrite|OVERWRITE)
+                cp "$source_file" "$destination"
+                echo "Overwritten: $destination"
+                ;;
+            a|A|append|APPEND)
+                printf '\n\n' >> "$destination"
+                cat "$source_file" >> "$destination"
+                echo "Appended: $destination"
+                ;;
+            *)
+                echo "Invalid action: $action" >&2
+                exit 1
+                ;;
+        esac
     fi
 else
     cp "$source_file" "$destination"
