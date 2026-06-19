@@ -1,12 +1,14 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 
 $versionDir = Join-Path $PSScriptRoot 'versions'
 $versionFiles = @(Get-ChildItem -LiteralPath $versionDir -File -Filter '*.md' |
     Where-Object { $_.BaseName -match '^\d+$' } |
     Sort-Object { [int]$_.BaseName })
 if ($versionFiles.Count -eq 0) {
-    throw "No numbered AGENTS.md versions were found in $versionDir."
+    throw "番号付きの AGENTS.md バージョンが見つかりません: $versionDir"
 }
 $source = $versionFiles[-1].FullName
 
@@ -23,22 +25,22 @@ $targets = @(Get-ChildItem -LiteralPath $homeDir -Directory -Force |
 $targets = @($targets + $defaultTarget | Sort-Object -Unique)
 $defaultIndex = [Array]::IndexOf($targets, $defaultTarget) + 1
 if ($defaultIndex -lt 1) {
-    throw "Default target was not found: $defaultTarget"
+    throw "既定のインストール先が見つかりません: $defaultTarget"
 }
 
-Write-Host 'Select install target (Enter selects *):'
+Write-Host 'インストール先を選択してください（Enter で * を選択）:'
 for ($i = 0; $i -lt $targets.Count; $i++) {
     $marker = if (($i + 1) -eq $defaultIndex) { '*' } else { ' ' }
     Write-Host ("{0} [{1}] {2}" -f $marker, ($i + 1), $targets[$i])
 }
 
-$selected = if ($env:CODEX_AGENTS_SELECT) { $env:CODEX_AGENTS_SELECT } else { Read-Host 'Number' }
+$selected = if ($env:CODEX_AGENTS_SELECT) { $env:CODEX_AGENTS_SELECT } else { Read-Host '番号' }
 if (-not $selected) {
     $selected = [string]$defaultIndex
 }
 $index = 0
 if (-not [int]::TryParse($selected, [ref]$index) -or $index -lt 1 -or $index -gt $targets.Count) {
-    throw "Invalid selection: $selected"
+    throw "無効な選択です: $selected"
 }
 
 $target = $targets[$index - 1]
@@ -49,7 +51,7 @@ $sourceContent = [System.IO.File]::ReadAllText($source, $utf8)
 
 if (Test-Path -LiteralPath $destination) {
     $existingContent = [System.IO.File]::ReadAllText($destination, $utf8)
-    Write-Host "Existing AGENTS.md:"
+    Write-Host '既存の AGENTS.md:'
     Write-Host '---'
     Write-Host $existingContent
     Write-Host '---'
@@ -74,40 +76,40 @@ if (Test-Path -LiteralPath $destination) {
     }
 
     if ($matchedPath -eq $source) {
-        Write-Host "Skipped: latest AGENTS.md version is already included in $destination."
+        Write-Host "スキップしました: 最新版の AGENTS.md は既に含まれています: $destination"
         exit 0
     }
     if ($matchedVersion) {
-        Write-Host "Current version: $matchedVersion"
-        Write-Host ("Install version: {0}" -f (Split-Path -Leaf $source))
-        $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Replace matched version? [Y/n]' }
+        Write-Host "現在のバージョン: $matchedVersion"
+        Write-Host ("インストールするバージョン: {0}" -f (Split-Path -Leaf $source))
+        $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host '一致した部分を置換しますか？ [Y/n]' }
         if ($save -and $save.ToLowerInvariant() -notin @('y', 'yes')) {
-            Write-Host "Skipped: $destination"
+            Write-Host "スキップしました: $destination"
             exit 0
         }
         $updatedContent = $existingContent.Replace($matchedContent, $sourceContent)
         [System.IO.File]::WriteAllText($destination, $updatedContent, $utf8)
-        Write-Host "Replaced matched version: $destination"
+        Write-Host "一致したバージョンを置換しました: $destination"
     } else {
-        $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'No known version matched. Action ([O]verwrite / [a]ppend)' }
+        $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host '操作を選択してください ([O] 上書き / [a] 追記)' }
         if (-not $action) {
             $action = 'overwrite'
         }
         switch ($action.ToLowerInvariant()) {
             { $_ -in @('o', 'overwrite') } {
                 [System.IO.File]::WriteAllText($destination, $sourceContent, $utf8)
-                Write-Host "Overwritten: $destination"
+                Write-Host "上書きしました: $destination"
             }
             { $_ -in @('a', 'append') } {
                 [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
-                Write-Host "Appended: $destination"
+                Write-Host "追記しました: $destination"
             }
             default {
-                throw "Invalid action: $action"
+                throw "無効な操作です: $action"
             }
         }
     }
 } else {
     Copy-Item -LiteralPath $source -Destination $destination
-    Write-Host "Installed: $destination"
+    Write-Host "インストールしました: $destination"
 }

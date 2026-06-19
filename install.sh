@@ -15,7 +15,7 @@ else
 fi
 
 if [ -z "$source_file" ] || [ ! -f "$source_file" ]; then
-    echo "No numbered AGENTS.md versions were found in $version_dir." >&2
+    echo "番号付きの AGENTS.md バージョンが見つかりません: $version_dir" >&2
     exit 1
 fi
 
@@ -48,7 +48,7 @@ fi
 
 default_index=0
 index=0
-printf 'Select install target (Enter selects *):\n'
+printf 'インストール先を選択してください（Enter で * を選択）:\n'
 while IFS= read -r path; do
     [ -n "$path" ] || continue
     index=$((index + 1))
@@ -64,13 +64,13 @@ $targets
 EOF
 
 if [ "$default_index" -eq 0 ]; then
-    echo "Default target was not found: $default_target" >&2
+    echo "既定のインストール先が見つかりません: $default_target" >&2
     exit 1
 fi
 
 selected=${CODEX_AGENTS_SELECT:-}
 if [ -z "$selected" ]; then
-    printf 'Number: '
+    printf '番号: '
     read -r selected
 fi
 if [ -z "$selected" ]; then
@@ -79,13 +79,13 @@ fi
 
 case "$selected" in
     ''|*[!0-9]*)
-        echo "Invalid selection: $selected" >&2
+        echo "無効な選択です: $selected" >&2
         exit 1
         ;;
 esac
 
 if [ "$selected" -lt 1 ] || [ "$selected" -gt "$count" ]; then
-    echo "Invalid selection: $selected" >&2
+    echo "無効な選択です: $selected" >&2
     exit 1
 fi
 
@@ -94,7 +94,7 @@ mkdir -p "$target"
 destination="$target/AGENTS.md"
 
 if [ -f "$destination" ]; then
-    echo "Existing AGENTS.md:"
+    echo "既存の AGENTS.md:"
     echo "---"
     cat "$destination"
     echo "---"
@@ -132,22 +132,22 @@ if [ -f "$destination" ]; then
         done
     fi
     if [ "$matched_file" = "$source_file" ]; then
-        echo "Skipped: latest AGENTS.md version is already included in $destination."
+        echo "スキップしました: 最新版の AGENTS.md は既に含まれています: $destination"
         exit 0
     fi
     if [ -n "$matched_file" ]; then
-        echo "Current version: $(basename "$matched_file")"
-        echo "Install version: $(basename "$source_file")"
+        echo "現在のバージョン: $(basename "$matched_file")"
+        echo "インストールするバージョン: $(basename "$source_file")"
         save=${CODEX_AGENTS_SAVE:-}
         if [ -z "$save" ]; then
-            printf 'Replace matched version? [Y/n]: '
+            printf '一致した部分を置換しますか？ [Y/n]: '
             read -r save
         fi
         case "$save" in
             ''|y|Y|yes|YES)
                 ;;
             *)
-                echo "Skipped: $destination"
+                echo "スキップしました: $destination"
                 exit 0
                 ;;
         esac
@@ -164,11 +164,11 @@ if [ -f "$destination" ]; then
             open my $out_fh, ">:encoding(UTF-8)", $destination or die $!;
             print {$out_fh} $existing;
         ' "$destination" "$matched_file" "$source_file"
-        echo "Replaced matched version: $destination"
+        echo "一致したバージョンを置換しました: $destination"
     else
         action=${CODEX_AGENTS_ACTION:-}
         if [ -z "$action" ]; then
-            printf 'No known version matched. Action ([O]verwrite / [a]ppend): '
+            printf '既知のバージョンに一致しません。操作を選択してください（[O] 上書き / [a] 追記）: '
             read -r action
         fi
         if [ -z "$action" ]; then
@@ -178,20 +178,20 @@ if [ -f "$destination" ]; then
         case "$action" in
             o|O|overwrite|OVERWRITE)
                 cp "$source_file" "$destination"
-                echo "Overwritten: $destination"
+                echo "上書きしました: $destination"
                 ;;
             a|A|append|APPEND)
                 printf '\n\n' >> "$destination"
                 cat "$source_file" >> "$destination"
-                echo "Appended: $destination"
+                echo "追記しました: $destination"
                 ;;
             *)
-                echo "Invalid action: $action" >&2
+                echo "無効な操作です: $action" >&2
                 exit 1
                 ;;
         esac
     fi
 else
     cp "$source_file" "$destination"
-    echo "Installed: $destination"
+    echo "インストールしました: $destination"
 fi
