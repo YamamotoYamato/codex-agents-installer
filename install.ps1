@@ -7,9 +7,9 @@ if (-not (Test-Path -LiteralPath $source)) {
 }
 
 $homeDir = if ($env:CODEX_AGENTS_HOME) { $env:CODEX_AGENTS_HOME } else { $HOME }
-$targets = Get-ChildItem -LiteralPath $homeDir -Directory -Force |
+$targets = @(Get-ChildItem -LiteralPath $homeDir -Directory -Force |
     Where-Object { $_.Name -like '.codex*' } |
-    Sort-Object Name
+    Sort-Object Name)
 
 if ($targets.Count -eq 0) {
     throw "No .codex* directories were found in $homeDir."
@@ -27,5 +27,35 @@ if (-not [int]::TryParse($selected, [ref]$index) -or $index -lt 1 -or $index -gt
 }
 
 $destination = Join-Path $targets[$index - 1].FullName 'AGENTS.md'
-Copy-Item -LiteralPath $source -Destination $destination -Force
-Write-Host "Installed: $destination"
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+$sourceContent = [System.IO.File]::ReadAllText($source, $utf8)
+
+if (Test-Path -LiteralPath $destination) {
+    $existingContent = [System.IO.File]::ReadAllText($destination, $utf8)
+    Write-Host "Existing AGENTS.md:"
+    Write-Host '---'
+    Write-Host $existingContent
+    Write-Host '---'
+
+    if ($existingContent.Contains($sourceContent)) {
+        throw "Abort: the same AGENTS.md content already exists in $destination."
+    }
+
+    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'Action ([o]verwrite / [a]ppend)' }
+    switch ($action.ToLowerInvariant()) {
+        { $_ -in @('o', 'overwrite') } {
+            Copy-Item -LiteralPath $source -Destination $destination -Force
+            Write-Host "Overwritten: $destination"
+        }
+        { $_ -in @('a', 'append') } {
+            [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
+            Write-Host "Appended: $destination"
+        }
+        default {
+            throw "Invalid action: $action"
+        }
+    }
+} else {
+    Copy-Item -LiteralPath $source -Destination $destination
+    Write-Host "Installed: $destination"
+}

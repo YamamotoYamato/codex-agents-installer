@@ -52,5 +52,44 @@ fi
 
 target=$(printf '%s' "$targets" | sed -n "${selected}p")
 destination="$target/AGENTS.md"
-cp "$source_file" "$destination"
-echo "Installed: $destination"
+
+if [ -f "$destination" ]; then
+    echo "Existing AGENTS.md:"
+    echo "---"
+    cat "$destination"
+    echo "---"
+
+    existing_content=$(cat "$destination")
+    source_content=$(cat "$source_file")
+    case "$existing_content" in
+        *"$source_content"*)
+            echo "Abort: the same AGENTS.md content already exists in $destination." >&2
+            exit 1
+            ;;
+    esac
+
+    action=${CODEX_AGENTS_ACTION:-}
+    if [ -z "$action" ]; then
+        printf 'Action ([o]verwrite / [a]ppend): '
+        read -r action
+    fi
+
+    case "$action" in
+        o|overwrite)
+            cp "$source_file" "$destination"
+            echo "Overwritten: $destination"
+            ;;
+        a|append)
+            printf '\n\n' >> "$destination"
+            cat "$source_file" >> "$destination"
+            echo "Appended: $destination"
+            ;;
+        *)
+            echo "Invalid action: $action" >&2
+            exit 1
+            ;;
+    esac
+else
+    cp "$source_file" "$destination"
+    echo "Installed: $destination"
+fi
