@@ -30,6 +30,13 @@ make --version
 
 その後、新しい PowerShell を開き直して `make --version` を確認してください。
 
+新しい PowerShell でも `make` が見つからない場合は、現在の端末で PATH を読み直してください。
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+make --version
+```
+
 ## インストール
 
 ```sh
