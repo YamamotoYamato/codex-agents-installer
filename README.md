@@ -6,29 +6,27 @@
 
 ## Windows で make を入れる
 
-Windows で `make` が入っていない場合は、先に PowerShell で次を実行してください。
+Windows で `make` が入っていない場合は、MSYS2 の `make` を使うのがおすすめです。
 
 ```powershell
-winget install GnuWin32.Make
+winget install MSYS2.MSYS2
 ```
 
-インストール後、新しい PowerShell を開き直して確認します。
-
-```powershell
-make --version
-```
-
-`make` が見つからない場合は、GnuWin32 の `bin` を PATH に追加してください。
+インストール後、PowerShell の PATH に MSYS2 を追加します。
 
 ```powershell
 [Environment]::SetEnvironmentVariable(
   "Path",
-  [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Program Files (x86)\GnuWin32\bin",
+  "C:\msys64\usr\bin;" + [Environment]::GetEnvironmentVariable("Path", "User"),
   "User"
 )
 ```
 
-その後、新しい PowerShell を開き直して `make --version` を確認してください。
+新しい PowerShell を開き直して確認します。
+
+```powershell
+make --version
+```
 
 新しい PowerShell でも `make` が見つからない場合は、現在の端末で PATH を読み直してください。
 
