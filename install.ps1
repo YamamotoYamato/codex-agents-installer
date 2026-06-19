@@ -38,12 +38,15 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host '---'
 
     $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Save changes? [y/N]' }
-    if ($save.ToLowerInvariant() -notin @('y', 'yes')) {
+    if (-not $save -or $save.ToLowerInvariant() -notin @('y', 'yes')) {
         Write-Host "Skipped: $destination"
         exit 0
     }
 
-    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'Action ([o]verwrite / [a]ppend)' }
+    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'Action ([O]verwrite / [a]ppend)' }
+    if (-not $action) {
+        $action = 'overwrite'
+    }
     switch ($action.ToLowerInvariant()) {
         { $_ -in @('o', 'overwrite') } {
             Copy-Item -LiteralPath $source -Destination $destination -Force

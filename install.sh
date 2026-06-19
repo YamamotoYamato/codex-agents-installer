@@ -76,8 +76,11 @@ if [ -f "$destination" ]; then
 
     action=${CODEX_AGENTS_ACTION:-}
     if [ -z "$action" ]; then
-        printf 'Action ([o]verwrite / [a]ppend): '
+        printf 'Action ([O]verwrite / [a]ppend): '
         read -r action
+    fi
+    if [ -z "$action" ]; then
+        action=overwrite
     fi
 
     case "$action" in
