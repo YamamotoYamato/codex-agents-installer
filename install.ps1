@@ -54,6 +54,10 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host $existingContent
     Write-Host '---'
 
+    if ($existingContent.Contains($sourceContent)) {
+        throw "Abort: latest AGENTS.md version is already included in $destination."
+    }
+
     $matchedVersion = $null
     $matchedContent = $null
     $previousVersionFiles = @()
@@ -69,40 +73,19 @@ if (Test-Path -LiteralPath $destination) {
         }
     }
     if ($matchedVersion) {
-        Write-Host "Matched previous version: $matchedVersion"
-    }
-
-    $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Save changes? [y/N]' }
-    if (-not $save -or $save.ToLowerInvariant() -notin @('y', 'yes')) {
-        Write-Host "Skipped: $destination"
-        exit 0
-    }
-
-    $actionPrompt = if ($matchedContent) { 'Action ([r]eplace matched / [O]verwrite / [a]ppend)' } else { 'Action ([O]verwrite / [a]ppend)' }
-    $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host $actionPrompt }
-    if (-not $action) {
-        $action = if ($matchedContent) { 'replace' } else { 'overwrite' }
-    }
-    switch ($action.ToLowerInvariant()) {
-        { $_ -in @('r', 'replace') } {
-            if (-not $matchedContent) {
-                throw "No previous AGENTS.md version matched in $destination."
-            }
-            $updatedContent = $existingContent.Replace($matchedContent, $sourceContent)
-            [System.IO.File]::WriteAllText($destination, $updatedContent, $utf8)
-            Write-Host "Replaced matched version: $destination"
+        Write-Host "Current version: $matchedVersion"
+        Write-Host ("Install version: {0}" -f (Split-Path -Leaf $source))
+        $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Replace matched version? [Y/n]' }
+        if ($save -and $save.ToLowerInvariant() -notin @('y', 'yes')) {
+            Write-Host "Skipped: $destination"
+            exit 0
         }
-        { $_ -in @('o', 'overwrite') } {
-            Copy-Item -LiteralPath $source -Destination $destination -Force
-            Write-Host "Overwritten: $destination"
-        }
-        { $_ -in @('a', 'append') } {
-            [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
-            Write-Host "Appended: $destination"
-        }
-        default {
-            throw "Invalid action: $action"
-        }
+        $updatedContent = $existingContent.Replace($matchedContent, $sourceContent)
+        [System.IO.File]::WriteAllText($destination, $updatedContent, $utf8)
+        Write-Host "Replaced matched version: $destination"
+    } else {
+        [System.IO.File]::AppendAllText($destination, "`r`n`r`n$sourceContent", $utf8)
+        Write-Host "Appended: $destination"
     }
 } else {
     Copy-Item -LiteralPath $source -Destination $destination

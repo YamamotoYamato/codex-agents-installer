@@ -99,6 +99,20 @@ if [ -f "$destination" ]; then
     cat "$destination"
     echo "---"
 
+    if perl -0e '
+        my ($destination, $source_file) = @ARGV;
+        open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
+        open my $source_fh, "<:encoding(UTF-8)", $source_file or die $!;
+        local $/;
+        my $existing = <$existing_fh>;
+        my $source = <$source_fh>;
+        exit(($source ne "" && index($existing, $source) >= 0) ? 0 : 1);
+    ' "$destination" "$source_file"
+    then
+        echo "Abort: latest AGENTS.md version is already included in $destination." >&2
+        exit 1
+    fi
+
     matched_file=
     if [ -d "$version_dir" ]; then
         for version_file in "$version_dir"/*.md; do
@@ -120,76 +134,40 @@ if [ -f "$destination" ]; then
         done
     fi
     if [ -n "$matched_file" ]; then
-        echo "Matched previous version: $(basename "$matched_file")"
-    fi
-
-    save=${CODEX_AGENTS_SAVE:-}
-    if [ -z "$save" ]; then
-        printf 'Save changes? [y/N]: '
-        read -r save
-    fi
-
-    case "$save" in
-        y|Y|yes|YES)
-            ;;
-        *)
-            echo "Skipped: $destination"
-            exit 0
-            ;;
-    esac
-
-    action=${CODEX_AGENTS_ACTION:-}
-    if [ -z "$action" ]; then
-        if [ -n "$matched_file" ]; then
-            printf 'Action ([r]eplace matched / [O]verwrite / [a]ppend): '
-        else
-            printf 'Action ([O]verwrite / [a]ppend): '
+        echo "Current version: $(basename "$matched_file")"
+        echo "Install version: $(basename "$source_file")"
+        save=${CODEX_AGENTS_SAVE:-}
+        if [ -z "$save" ]; then
+            printf 'Replace matched version? [Y/n]: '
+            read -r save
         fi
-        read -r action
+        case "$save" in
+            ''|y|Y|yes|YES)
+                ;;
+            *)
+                echo "Skipped: $destination"
+                exit 0
+                ;;
+        esac
+        perl -e '
+            my ($destination, $matched_file, $source_file) = @ARGV;
+            local $/;
+            open my $destination_fh, "<:encoding(UTF-8)", $destination or die $!;
+            open my $old_fh, "<:encoding(UTF-8)", $matched_file or die $!;
+            open my $new_fh, "<:encoding(UTF-8)", $source_file or die $!;
+            my $existing = <$destination_fh>;
+            my $old = <$old_fh>;
+            my $new = <$new_fh>;
+            $existing =~ s/\Q$old\E/$new/g;
+            open my $out_fh, ">:encoding(UTF-8)", $destination or die $!;
+            print {$out_fh} $existing;
+        ' "$destination" "$matched_file" "$source_file"
+        echo "Replaced matched version: $destination"
+    else
+        printf '\n\n' >> "$destination"
+        cat "$source_file" >> "$destination"
+        echo "Appended: $destination"
     fi
-    if [ -z "$action" ]; then
-        if [ -n "$matched_file" ]; then
-            action=replace
-        else
-            action=overwrite
-        fi
-    fi
-
-    case "$action" in
-        r|R|replace|REPLACE)
-            if [ -z "$matched_file" ]; then
-                echo "No previous AGENTS.md version matched in $destination." >&2
-                exit 1
-            fi
-            perl -e '
-                my ($destination, $matched_file, $source_file) = @ARGV;
-                local $/;
-                open my $destination_fh, "<:encoding(UTF-8)", $destination or die $!;
-                open my $old_fh, "<:encoding(UTF-8)", $matched_file or die $!;
-                open my $new_fh, "<:encoding(UTF-8)", $source_file or die $!;
-                my $existing = <$destination_fh>;
-                my $old = <$old_fh>;
-                my $new = <$new_fh>;
-                $existing =~ s/\Q$old\E/$new/g;
-                open my $out_fh, ">:encoding(UTF-8)", $destination or die $!;
-                print {$out_fh} $existing;
-            ' "$destination" "$matched_file" "$source_file"
-            echo "Replaced matched version: $destination"
-            ;;
-        o|O|overwrite|OVERWRITE)
-            cp "$source_file" "$destination"
-            echo "Overwritten: $destination"
-            ;;
-        a|A|append|APPEND)
-            printf '\n\n' >> "$destination"
-            cat "$source_file" >> "$destination"
-            echo "Appended: $destination"
-            ;;
-        *)
-            echo "Invalid action: $action" >&2
-            exit 1
-            ;;
-    esac
 else
     cp "$source_file" "$destination"
     echo "Installed: $destination"
