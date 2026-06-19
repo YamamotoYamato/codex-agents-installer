@@ -4,6 +4,20 @@
 
 インストールされる内容は `versions/` にある番号付き Markdown から選ばれます。たとえば `versions/1.md`、`versions/2.md` がある場合、最も番号が大きい `versions/2.md` が最新版として使われます。
 
+## Windows で make を入れる
+
+Windows で `make` が入っていない場合は、先に PowerShell で次を実行してください。
+
+```powershell
+winget install GnuWin32.Make
+```
+
+インストール後、新しい PowerShell を開き直して確認します。
+
+```powershell
+make --version
+```
+
 ## インストール
 
 ```sh
