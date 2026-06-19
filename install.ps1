@@ -1,10 +1,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$source = Join-Path $PSScriptRoot 'AGENTS.md'
-if (-not (Test-Path -LiteralPath $source)) {
-    throw "AGENTS.md was not found next to install.ps1."
+$versionDir = Join-Path $PSScriptRoot 'versions'
+$versionFiles = @(Get-ChildItem -LiteralPath $versionDir -File -Filter '*.md' |
+    Where-Object { $_.BaseName -match '^\d+$' } |
+    Sort-Object { [int]$_.BaseName })
+if ($versionFiles.Count -eq 0) {
+    throw "No numbered AGENTS.md versions were found in $versionDir."
 }
+$source = $versionFiles[-1].FullName
 
 $homeDir = if ($env:CODEX_AGENTS_HOME) { $env:CODEX_AGENTS_HOME } else { $HOME }
 $defaultTarget = if ($env:CODEX_HOME -and (Test-Path -LiteralPath $env:CODEX_HOME -PathType Container)) {
@@ -42,7 +46,6 @@ New-Item -ItemType Directory -Force -Path $target | Out-Null
 $destination = Join-Path $target 'AGENTS.md'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $sourceContent = [System.IO.File]::ReadAllText($source, $utf8)
-$versionDir = Join-Path $PSScriptRoot 'versions'
 
 if (Test-Path -LiteralPath $destination) {
     $existingContent = [System.IO.File]::ReadAllText($destination, $utf8)
@@ -53,15 +56,16 @@ if (Test-Path -LiteralPath $destination) {
 
     $matchedVersion = $null
     $matchedContent = $null
-    if (Test-Path -LiteralPath $versionDir -PathType Container) {
-        $versionFiles = @(Get-ChildItem -LiteralPath $versionDir -File -Filter '*.md' | Sort-Object Name)
-        foreach ($versionFile in $versionFiles) {
-            $versionContent = [System.IO.File]::ReadAllText($versionFile.FullName, $utf8)
-            if ($versionContent -and $existingContent.Contains($versionContent)) {
-                $matchedVersion = $versionFile.Name
-                $matchedContent = $versionContent
-                break
-            }
+    $previousVersionFiles = @()
+    if ($versionFiles.Count -gt 1) {
+        $previousVersionFiles = @($versionFiles | Select-Object -First ($versionFiles.Count - 1))
+    }
+    foreach ($versionFile in $previousVersionFiles) {
+        $versionContent = [System.IO.File]::ReadAllText($versionFile.FullName, $utf8)
+        if ($versionContent -and $existingContent.Contains($versionContent)) {
+            $matchedVersion = $versionFile.Name
+            $matchedContent = $versionContent
+            break
         }
     }
     if ($matchedVersion) {

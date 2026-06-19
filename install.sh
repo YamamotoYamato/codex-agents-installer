@@ -2,8 +2,11 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-source_file="$script_dir/AGENTS.md"
 version_dir="$script_dir/versions"
+source_file=$(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
+    sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
+    sort -n |
+    awk 'END { print $2 }')
 home_dir=${CODEX_AGENTS_HOME:-$HOME}
 if [ -n "${CODEX_HOME:-}" ] && [ -d "$CODEX_HOME" ]; then
     default_target=$CODEX_HOME
@@ -11,8 +14,8 @@ else
     default_target=$home_dir/.codex
 fi
 
-if [ ! -f "$source_file" ]; then
-    echo "AGENTS.md was not found next to install.sh." >&2
+if [ -z "$source_file" ] || [ ! -f "$source_file" ]; then
+    echo "No numbered AGENTS.md versions were found in $version_dir." >&2
     exit 1
 fi
 
@@ -100,6 +103,7 @@ if [ -f "$destination" ]; then
     if [ -d "$version_dir" ]; then
         for version_file in "$version_dir"/*.md; do
             [ -f "$version_file" ] || continue
+            [ "$version_file" != "$source_file" ] || continue
             if perl -0e '
                 my ($destination, $version_file) = @ARGV;
                 open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
