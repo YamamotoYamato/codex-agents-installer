@@ -57,13 +57,19 @@ if (Test-Path -LiteralPath $destination) {
     $matchedVersion = $null
     $matchedContent = $null
     $matchedPath = $null
-    foreach ($versionFile in @($versionFiles | Sort-Object { [int]$_.BaseName } -Descending)) {
+    $matchedLength = -1
+    foreach ($versionFile in $versionFiles) {
         $versionContent = [System.IO.File]::ReadAllText($versionFile.FullName, $utf8)
         if ($versionContent -and $existingContent.Contains($versionContent)) {
-            $matchedVersion = $versionFile.Name
-            $matchedContent = $versionContent
-            $matchedPath = $versionFile.FullName
-            break
+            $versionLength = $versionContent.Length
+            $versionNumber = [int]$versionFile.BaseName
+            $matchedNumber = if ($matchedVersion) { [int][System.IO.Path]::GetFileNameWithoutExtension($matchedVersion) } else { -1 }
+            if ($versionLength -gt $matchedLength -or ($versionLength -eq $matchedLength -and $versionNumber -gt $matchedNumber)) {
+                $matchedVersion = $versionFile.Name
+                $matchedContent = $versionContent
+                $matchedPath = $versionFile.FullName
+                $matchedLength = $versionLength
+            }
         }
     }
 

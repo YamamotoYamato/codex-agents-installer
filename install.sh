@@ -101,11 +101,16 @@ if [ -f "$destination" ]; then
 
     matched_file=
     if [ -d "$version_dir" ]; then
-        for version_file in $(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
-            sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
-            sort -rn |
-            awk '{ print $2 }'); do
+        matched_length=-1
+        matched_number=-1
+        for version_file in "$version_dir"/*.md; do
             [ -f "$version_file" ] || continue
+            version_number=$(basename "$version_file" .md)
+            case "$version_number" in
+                ''|*[!0-9]*)
+                    continue
+                    ;;
+            esac
             if perl -0e '
                 my ($destination, $version_file) = @ARGV;
                 open my $existing_fh, "<:encoding(UTF-8)", $destination or die $!;
@@ -116,8 +121,13 @@ if [ -f "$destination" ]; then
                 exit(($version ne "" && index($existing, $version) >= 0) ? 0 : 1);
             ' "$destination" "$version_file"
             then
-                matched_file=$version_file
-                break
+                version_length=$(wc -c < "$version_file")
+                if [ "$version_length" -gt "$matched_length" ] ||
+                    { [ "$version_length" -eq "$matched_length" ] && [ "$version_number" -gt "$matched_number" ]; }; then
+                    matched_file=$version_file
+                    matched_length=$version_length
+                    matched_number=$version_number
+                fi
             fi
         done
     fi
