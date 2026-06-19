@@ -7,26 +7,39 @@ if (-not (Test-Path -LiteralPath $source)) {
 }
 
 $homeDir = if ($env:CODEX_AGENTS_HOME) { $env:CODEX_AGENTS_HOME } else { $HOME }
+$defaultTarget = if ($env:CODEX_HOME -and (Test-Path -LiteralPath $env:CODEX_HOME -PathType Container)) {
+    [System.IO.Path]::GetFullPath($env:CODEX_HOME)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $homeDir '.codex'))
+}
 $targets = @(Get-ChildItem -LiteralPath $homeDir -Directory -Force |
     Where-Object { $_.Name -like '.codex*' } |
-    Sort-Object Name)
+    ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) })
 
-if ($targets.Count -eq 0) {
-    throw "No .codex* directories were found in $homeDir."
+$targets = @($targets + $defaultTarget | Sort-Object -Unique)
+$defaultIndex = [Array]::IndexOf($targets, $defaultTarget) + 1
+if ($defaultIndex -lt 1) {
+    throw "Default target was not found: $defaultTarget"
 }
 
-Write-Host 'Select install target:'
+Write-Host 'Select install target (Enter selects *):'
 for ($i = 0; $i -lt $targets.Count; $i++) {
-    Write-Host ("[{0}] {1}" -f ($i + 1), $targets[$i].FullName)
+    $marker = if (($i + 1) -eq $defaultIndex) { '*' } else { ' ' }
+    Write-Host ("{0} [{1}] {2}" -f $marker, ($i + 1), $targets[$i])
 }
 
 $selected = if ($env:CODEX_AGENTS_SELECT) { $env:CODEX_AGENTS_SELECT } else { Read-Host 'Number' }
+if (-not $selected) {
+    $selected = [string]$defaultIndex
+}
 $index = 0
 if (-not [int]::TryParse($selected, [ref]$index) -or $index -lt 1 -or $index -gt $targets.Count) {
     throw "Invalid selection: $selected"
 }
 
-$destination = Join-Path $targets[$index - 1].FullName 'AGENTS.md'
+$target = $targets[$index - 1]
+New-Item -ItemType Directory -Force -Path $target | Out-Null
+$destination = Join-Path $target 'AGENTS.md'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $sourceContent = [System.IO.File]::ReadAllText($source, $utf8)
 

@@ -4,6 +4,11 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 source_file="$script_dir/AGENTS.md"
 home_dir=${CODEX_AGENTS_HOME:-$HOME}
+if [ -n "${CODEX_HOME:-}" ] && [ -d "$CODEX_HOME" ]; then
+    default_target=$CODEX_HOME
+else
+    default_target=$home_dir/.codex
+fi
 
 if [ ! -f "$source_file" ]; then
     echo "AGENTS.md was not found next to install.sh." >&2
@@ -11,11 +16,6 @@ if [ ! -f "$source_file" ]; then
 fi
 
 set -- "$home_dir"/.codex*
-if [ "$1" = "$home_dir/.codex*" ]; then
-    echo "No .codex* directories were found in $home_dir." >&2
-    exit 1
-fi
-
 targets=""
 count=0
 for path in "$@"; do
@@ -23,12 +23,44 @@ for path in "$@"; do
         count=$((count + 1))
         targets="${targets}${path}
 "
-        printf '[%s] %s\n' "$count" "$path"
     fi
 done
 
-if [ "$count" -eq 0 ]; then
-    echo "No .codex* directories were found in $home_dir." >&2
+has_default=0
+while IFS= read -r path; do
+    if [ "$path" = "$default_target" ]; then
+        has_default=1
+        break
+    fi
+done <<EOF
+$targets
+EOF
+
+if [ "$has_default" -eq 0 ]; then
+    count=$((count + 1))
+    targets="${targets}${default_target}
+"
+fi
+
+default_index=0
+index=0
+printf 'Select install target (Enter selects *):\n'
+while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    index=$((index + 1))
+    if [ "$path" = "$default_target" ]; then
+        default_index=$index
+        marker='*'
+    else
+        marker=' '
+    fi
+    printf '%s [%s] %s\n' "$marker" "$index" "$path"
+done <<EOF
+$targets
+EOF
+
+if [ "$default_index" -eq 0 ]; then
+    echo "Default target was not found: $default_target" >&2
     exit 1
 fi
 
@@ -36,6 +68,9 @@ selected=${CODEX_AGENTS_SELECT:-}
 if [ -z "$selected" ]; then
     printf 'Number: '
     read -r selected
+fi
+if [ -z "$selected" ]; then
+    selected=$default_index
 fi
 
 case "$selected" in
@@ -51,6 +86,7 @@ if [ "$selected" -lt 1 ] || [ "$selected" -gt "$count" ]; then
 fi
 
 target=$(printf '%s' "$targets" | sed -n "${selected}p")
+mkdir -p "$target"
 destination="$target/AGENTS.md"
 
 if [ -f "$destination" ]; then
