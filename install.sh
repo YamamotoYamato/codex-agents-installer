@@ -59,12 +59,18 @@ if [ -f "$destination" ]; then
     cat "$destination"
     echo "---"
 
-    existing_content=$(cat "$destination")
-    source_content=$(cat "$source_file")
-    case "$existing_content" in
-        *"$source_content"*)
-            echo "Abort: the same AGENTS.md content already exists in $destination." >&2
-            exit 1
+    save=${CODEX_AGENTS_SAVE:-}
+    if [ -z "$save" ]; then
+        printf 'Save changes? [y/N]: '
+        read -r save
+    fi
+
+    case "$save" in
+        y|yes)
+            ;;
+        *)
+            echo "Skipped: $destination"
+            exit 0
             ;;
     esac
 

@@ -37,8 +37,10 @@ if (Test-Path -LiteralPath $destination) {
     Write-Host $existingContent
     Write-Host '---'
 
-    if ($existingContent.Contains($sourceContent)) {
-        throw "Abort: the same AGENTS.md content already exists in $destination."
+    $save = if ($env:CODEX_AGENTS_SAVE) { $env:CODEX_AGENTS_SAVE } else { Read-Host 'Save changes? [y/N]' }
+    if ($save.ToLowerInvariant() -notin @('y', 'yes')) {
+        Write-Host "Skipped: $destination"
+        exit 0
     }
 
     $action = if ($env:CODEX_AGENTS_ACTION) { $env:CODEX_AGENTS_ACTION } else { Read-Host 'Action ([o]verwrite / [a]ppend)' }

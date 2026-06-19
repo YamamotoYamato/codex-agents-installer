@@ -14,7 +14,7 @@ make install
 
 実行すると、ホームディレクトリ直下の `.codex`、`.codex-hattori` など `.codex*` に一致するディレクトリが表示されます。番号を入力すると、選択したディレクトリに `AGENTS.md` がコピーされます。
 
-選択したディレクトリに既に `AGENTS.md` がある場合は、先に内容を表示します。同じ内容が既に含まれている場合は中止し、含まれていない場合は上書きまたは追記を選択できます。
+選択したディレクトリに既に `AGENTS.md` がある場合は、先に内容を表示します。その後、保存するかどうかを選択できます。保存する場合は、上書きまたは追記を選択できます。
 
 ## テスト
 
@@ -31,4 +31,4 @@ CODEX_AGENTS_HOME="$tmp" CODEX_AGENTS_SELECT=1 ./install.sh
 test -f "$tmp/.codex/AGENTS.md"
 ```
 
-既存ファイルへの追記をテストする場合は、`CODEX_AGENTS_ACTION=append` を指定できます。
+既存ファイルへの追記をテストする場合は、`CODEX_AGENTS_SAVE=yes` と `CODEX_AGENTS_ACTION=append` を指定できます。
