@@ -18,6 +18,18 @@ winget install GnuWin32.Make
 make --version
 ```
 
+`make` が見つからない場合は、GnuWin32 の `bin` を PATH に追加してください。
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Program Files (x86)\GnuWin32\bin",
+  "User"
+)
+```
+
+その後、新しい PowerShell を開き直して `make --version` を確認してください。
+
 ## インストール
 
 ```sh
