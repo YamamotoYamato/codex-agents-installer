@@ -14,27 +14,7 @@ make install
 
 選択したディレクトリに既に `AGENTS.md` がある場合は、先に内容を表示します。同じ内容が既に含まれている場合は中止し、含まれていない場合は上書きまたは追記を選択できます。
 
-## make を使わない場合
-
-Windows:
-
-```powershell
-git clone https://github.com/YamamotoYamato/codex-agents-installer.git
-cd codex-agents-installer
-.\install.ps1
-```
-
-Linux / macOS:
-
-```sh
-git clone https://github.com/YamamotoYamato/codex-agents-installer.git
-cd codex-agents-installer
-./install.sh
-```
-
 ## テスト
-
-`make` が入っている場合は、次のコマンドでテストできます。
 
 ```sh
 make test
