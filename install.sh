@@ -3,6 +3,42 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
+is_wsl() {
+    [ -f /proc/version ] && grep -qi microsoft /proc/version
+}
+
+to_unix_path() {
+    case "$1" in
+        [A-Za-z]:\\*)
+            if command -v wslpath >/dev/null 2>&1; then
+                wslpath "$1"
+            else
+                printf '%s\n' "$1"
+            fi
+            ;;
+        *)
+            printf '%s\n' "$1"
+            ;;
+    esac
+}
+
+default_home_dir() {
+    if is_wsl && [ -n "${USERPROFILE:-}" ] && command -v wslpath >/dev/null 2>&1; then
+        wslpath "$USERPROFILE"
+    elif is_wsl; then
+        case "$script_dir" in
+            /mnt/?/Users/*/*)
+                printf '%s\n' "$script_dir" | cut -d / -f 1-5
+                ;;
+            *)
+                printf '%s\n' "$HOME"
+                ;;
+        esac
+    else
+        printf '%s\n' "$HOME"
+    fi
+}
+
 if [ "${CODEX_AGENTS_SKIP_UPDATE:-}" != "1" ] && [ -d "$script_dir/.git" ] && command -v git >/dev/null 2>&1; then
     echo "最新版を取得しています..."
     git -C "$script_dir" pull --ff-only
@@ -13,9 +49,18 @@ source_file=$(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
     sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
     sort -n |
     awk 'END { print $2 }')
-home_dir=${CODEX_AGENTS_HOME:-$HOME}
-if [ -n "${CODEX_HOME:-}" ] && [ -d "$CODEX_HOME" ]; then
-    default_target=$CODEX_HOME
+if [ -n "${CODEX_AGENTS_HOME:-}" ]; then
+    home_dir=$(to_unix_path "$CODEX_AGENTS_HOME")
+else
+    home_dir=$(default_home_dir)
+fi
+
+codex_home=${CODEX_HOME:-}
+if [ -n "$codex_home" ]; then
+    codex_home=$(to_unix_path "$codex_home")
+fi
+if [ -n "$codex_home" ] && [ -d "$codex_home" ]; then
+    default_target=$codex_home
 else
     default_target=$home_dir/.codex
 fi
