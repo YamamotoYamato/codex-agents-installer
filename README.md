@@ -14,7 +14,7 @@ Windows では Git for Windows を入れると Git Bash も一緒に入ります
 winget install Git.Git
 ```
 
-macOS と Linux では通常そのまま `bash` を使えます。`make` は不要です。
+macOS と Linux では通常そのまま `bash` を使えます。
 
 ## インストール
 
