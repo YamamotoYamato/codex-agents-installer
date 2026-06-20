@@ -46,6 +46,7 @@ maybe_shutdown_wsl() {
     shutdown=${CODEX_AGENTS_SHUTDOWN_WSL:-}
     if [ -z "$shutdown" ]; then
         [ -t 0 ] || return 0
+        echo "このインストーラは WSL 上で実行されました。PowerShell から bash を実行した場合、WSL が自動起動していることがあります。"
         printf 'WSL を終了しますか？ [y/N]: '
         read -r shutdown || return 0
     fi
