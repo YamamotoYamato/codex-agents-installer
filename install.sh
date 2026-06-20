@@ -103,6 +103,7 @@ if [ -f "$destination" ]; then
     echo "既存の AGENTS.md:"
     echo "---"
     cat "$destination"
+    echo
     echo "---"
 
     matched_file=
