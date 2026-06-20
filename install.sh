@@ -39,6 +39,27 @@ default_home_dir() {
     fi
 }
 
+maybe_shutdown_wsl() {
+    is_wsl || return 0
+    command -v wsl.exe >/dev/null 2>&1 || return 0
+
+    shutdown=${CODEX_AGENTS_SHUTDOWN_WSL:-}
+    if [ -z "$shutdown" ]; then
+        [ -t 0 ] || return 0
+        printf 'WSL を終了しますか？ [y/N]: '
+        read -r shutdown || return 0
+    fi
+
+    case "$shutdown" in
+        y|Y|yes|YES)
+            echo "WSL を終了します..."
+            wsl.exe --shutdown >/dev/null 2>&1 || echo "WSL の終了に失敗しました。" >&2
+            ;;
+    esac
+}
+
+trap maybe_shutdown_wsl EXIT
+
 if [ "${CODEX_AGENTS_SKIP_UPDATE:-}" != "1" ] && [ -d "$script_dir/.git" ] && command -v git >/dev/null 2>&1; then
     echo "最新版を取得しています..."
     git -C "$script_dir" pull --ff-only
