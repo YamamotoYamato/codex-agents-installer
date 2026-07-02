@@ -2,11 +2,15 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
+install_registry_key=codex-agents.installs
 
+# WSL 上で実行中かどうかを判定する。
 is_wsl() {
     [ -f /proc/version ] && grep -qi microsoft /proc/version
 }
 
+# Windows パスを必要に応じて Unix パスへ変換する。
 to_unix_path() {
     case "$1" in
         [A-Za-z]:\\*)
@@ -22,13 +26,14 @@ to_unix_path() {
     esac
 }
 
+# 既定のホームディレクトリを解決する。
 default_home_dir() {
     if is_wsl && [ -n "${USERPROFILE:-}" ] && command -v wslpath >/dev/null 2>&1; then
         wslpath "$USERPROFILE"
     elif is_wsl; then
-        case "$script_dir" in
+        case "$repo_dir" in
             /mnt/?/Users/*/*)
-                printf '%s\n' "$script_dir" | cut -d / -f 1-5
+                printf '%s\n' "$repo_dir" | cut -d / -f 1-5
                 ;;
             *)
                 printf '%s\n' "$HOME"
@@ -39,6 +44,7 @@ default_home_dir() {
     fi
 }
 
+# WSL 自動起動時のみ終了確認を行う。
 maybe_shutdown_wsl() {
     is_wsl || return 0
     command -v wsl.exe >/dev/null 2>&1 || return 0
@@ -59,14 +65,36 @@ maybe_shutdown_wsl() {
     esac
 }
 
+# バージョンファイルからバージョン番号を返す。
+version_number_from_file() {
+    basename "$1" .md
+}
+
+# 最新版のバージョン番号を返す。
+latest_version_number() {
+    version_number_from_file "$source_file"
+}
+
+# 最後に確認した記録を Git のグローバル設定へ保存する。
+save_install_record() {
+    command -v git >/dev/null 2>&1 || return 0
+
+    version_number=$1
+    checked_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    record=$(printf '%s\t%s\t%s' "$target" "$version_number" "$checked_at")
+    pattern=$(printf '^%s\t' "$target" | sed 's/[.[\*^$+?{}()|\\]/\\&/g')
+
+    git config --global --replace-all "$install_registry_key" "$record" "$pattern"
+}
+
 trap maybe_shutdown_wsl EXIT
 
-if [ "${CODEX_AGENTS_SKIP_UPDATE:-}" != "1" ] && [ -d "$script_dir/.git" ] && command -v git >/dev/null 2>&1; then
+if [ "${CODEX_AGENTS_SKIP_UPDATE:-}" != "1" ] && [ -d "$repo_dir/.git" ] && command -v git >/dev/null 2>&1; then
     echo "最新版を取得しています..."
-    git -C "$script_dir" pull --ff-only
+    git -C "$repo_dir" pull --ff-only
 fi
 
-version_dir="$script_dir/versions"
+version_dir="$repo_dir/versions"
 source_file=$(find "$version_dir" -maxdepth 1 -type f -name '*.md' |
     sed -n 's#.*/\([0-9][0-9]*\)\.md$#\1 &#p' |
     sort -n |
@@ -206,10 +234,12 @@ if [ -f "$destination" ]; then
         done
     fi
     if [ "$matched_file" = "$source_file" ]; then
+        save_install_record "$(latest_version_number)"
         echo "スキップしました: 最新版の AGENTS.md は既に含まれています: $destination"
         exit 0
     fi
     if [ -n "$matched_file" ]; then
+        matched_version=$(version_number_from_file "$matched_file")
         echo "現在のバージョン: $(basename "$matched_file")"
         echo "インストールするバージョン: $(basename "$source_file")"
         save=${CODEX_AGENTS_SAVE:-}
@@ -221,6 +251,7 @@ if [ -f "$destination" ]; then
             ''|y|Y|yes|YES)
                 ;;
             *)
+                save_install_record "$matched_version"
                 echo "スキップしました: $destination"
                 exit 0
                 ;;
@@ -238,6 +269,7 @@ if [ -f "$destination" ]; then
             open my $out_fh, ">:encoding(UTF-8)", $destination or die $!;
             print {$out_fh} $existing;
         ' "$destination" "$matched_file" "$source_file"
+        save_install_record "$(latest_version_number)"
         echo "一致したバージョンを置換しました: $destination"
     else
         action=${CODEX_AGENTS_ACTION:-}
@@ -252,11 +284,13 @@ if [ -f "$destination" ]; then
         case "$action" in
             o|O|overwrite|OVERWRITE)
                 cp "$source_file" "$destination"
+                save_install_record "$(latest_version_number)"
                 echo "上書きしました: $destination"
                 ;;
             a|A|append|APPEND)
                 printf '\n\n' >> "$destination"
                 cat "$source_file" >> "$destination"
+                save_install_record "$(latest_version_number)"
                 echo "追記しました: $destination"
                 ;;
             *)
@@ -267,5 +301,6 @@ if [ -f "$destination" ]; then
     fi
 else
     cp "$source_file" "$destination"
+    save_install_record "$(latest_version_number)"
     echo "インストールしました: $destination"
 fi

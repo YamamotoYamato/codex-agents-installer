@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+install_registry_key=codex-agents.installs
+
+# インストーラの使い方を表示する。
+print_usage() {
+    cat <<'EOF'
+使い方:
+  codex-agents-installer
+  codex-agents-installer -s
+  codex-agents-installer --status
+EOF
+}
+
+# インストール記録を一覧表示する。
+print_status() {
+    if ! command -v git >/dev/null 2>&1; then
+        echo "Git が見つかりません。" >&2
+        exit 1
+    fi
+
+    git config --global --get-all "$install_registry_key" || true
+}
+
+case "${1:-}" in
+    '')
+        exec "$script_dir/libexec/install-agents.sh"
+        ;;
+    -s|--status)
+        shift
+        if [ "$#" -ne 0 ]; then
+            print_usage >&2
+            exit 1
+        fi
+        print_status
+        ;;
+    -h|--help)
+        shift
+        if [ "$#" -ne 0 ]; then
+            print_usage >&2
+            exit 1
+        fi
+        print_usage
+        ;;
+    *)
+        print_usage >&2
+        exit 1
+        ;;
+esac
