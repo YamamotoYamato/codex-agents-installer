@@ -1,0 +1,2 @@
+# Codex のコンテキストウィンドウを既定値の半分にする。
+model_context_window = 136000

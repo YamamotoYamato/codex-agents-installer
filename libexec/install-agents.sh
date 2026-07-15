@@ -75,6 +75,63 @@ latest_version_number() {
     version_number_from_file "$source_file"
 }
 
+# 最新の config.toml バージョンファイルを返す。
+latest_config_file() {
+    find "$version_dir" -maxdepth 1 -type f -name '*.toml' |
+        sed -n 's#.*/\([0-9][0-9]*\)\.toml$#\1 &#p' |
+        sort -n |
+        awk 'END { print $2 }'
+}
+
+# 番号付き config.toml の管理ブロックを対象へ反映する。
+apply_config_version() {
+    config_file=$1
+    config_version_file=$2
+    [ -f "$config_version_file" ] || return 0
+    mkdir -p "$(dirname "$config_file")"
+    [ -f "$config_file" ] || : > "$config_file"
+    before_checksum=$(cksum "$config_file")
+    perl -e '
+        my ($config_file, $version_file) = @ARGV;
+        local $/;
+        open my $config_fh, "<:encoding(UTF-8)", $config_file or die $!;
+        open my $version_fh, "<:encoding(UTF-8)", $version_file or die $!;
+        my $config = <$config_fh>;
+        my $version = <$version_fh>;
+        my $managed = $config;
+        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\n.*?^# END CODEX-AGENTS-INSTALLER\n?//ms;
+        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*\s*=\s*.+?)\s*$/mg);
+        my @conflicts = grep {
+            my ($key) = /^([A-Za-z][A-Za-z0-9_-]*)\s*=/;
+            $managed =~ /^\Q$key\E\s*=/m;
+        } @settings;
+        if (@conflicts && ($ENV{CODEX_AGENTS_CONFIG_OVERWRITE} // "") !~ /^(?i:yes|y)$/) {
+            print "管理対象外の config.toml に既存の設定があります: ", join(", ", map { /^([A-Za-z][A-Za-z0-9_-]*)/; $1 } @conflicts), "\n";
+            print "上書きしますか？ [y/N]: ";
+            my $answer = <STDIN> // "";
+            exit 1 unless $answer =~ /^(?i:\s*y(?:es)?\s*)$/;
+        }
+        my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n" .
+            join("\n", @settings) .
+            (scalar(@settings) ? "\n" : "") .
+            "# END CODEX-AGENTS-INSTALLER";
+        $config = $managed;
+        if ($config =~ /^\[/m) {
+            $config =~ s/^(?=\[)/$block\n\n/m;
+        } else {
+            $config .= "\n" unless $config eq "" || $config =~ /\n\z/;
+            $config .= "$block\n";
+        }
+        open my $out_fh, ">:encoding(UTF-8)", $config_file or die $!;
+        print {$out_fh} $config;
+    ' "$config_file" "$config_version_file"
+    if [ "$before_checksum" = "$(cksum "$config_file")" ]; then
+        echo "スキップしました: config.toml は既に最新版です: $config_file"
+    else
+        echo "config.toml を更新しました: $config_file"
+    fi
+}
+
 # 最後に確認した記録を Git のグローバル設定へ保存する。
 save_install_record() {
     command -v git >/dev/null 2>&1 || return 0
@@ -119,6 +176,7 @@ if [ -z "$source_file" ] || [ ! -f "$source_file" ]; then
     echo "番号付きの AGENTS.md バージョンが見つかりません: $version_dir" >&2
     exit 1
 fi
+config_version_file=$(latest_config_file)
 
 set -- "$home_dir"/.codex*
 targets=""
@@ -192,6 +250,7 @@ fi
 
 target=$(printf '%s' "$targets" | sed -n "${selected}p")
 mkdir -p "$target"
+apply_config_version "$target/config.toml" "$config_version_file"
 destination="$target/AGENTS.md"
 
 if [ -f "$destination" ]; then
