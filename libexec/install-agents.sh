@@ -99,24 +99,28 @@ apply_config_version() {
         my $config = <$config_fh>;
         my $version = <$version_fh>;
         my $managed = $config;
-        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\n.*?^# END CODEX-AGENTS-INSTALLER\n?//ms;
-        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*\s*=\s*.+?)\s*$/mg);
-        my @conflicts = grep {
-            my ($key) = /^([A-Za-z][A-Za-z0-9_-]*)\s*=/;
-            $managed =~ /^\Q$key\E\s*=/m;
+        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//ms;
+        $version =~ s/\s+\z//;
+        my $has_table = $version =~ /^\s*\[\[/m;
+        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*.+?\s*$/mg);
+        my @conflicts = $has_table ? () : grep {
+            $managed =~ /^\Q$_\E\s*=/m;
+        } map {
+            /^([A-Za-z][A-Za-z0-9_-]*)\s*=/;
+            $1;
         } @settings;
         if (@conflicts && ($ENV{CODEX_AGENTS_CONFIG_OVERWRITE} // "") !~ /^(?i:yes|y)$/) {
-            print "管理対象外の config.toml に既存の設定があります: ", join(", ", map { /^([A-Za-z][A-Za-z0-9_-]*)/; $1 } @conflicts), "\n";
+            print "管理対象外の config.toml に既存の設定があります: ", join(", ", @conflicts), "\n";
             print "上書きしますか？ [y/N]: ";
             my $answer = <STDIN> // "";
             exit 1 unless $answer =~ /^(?i:\s*y(?:es)?\s*)$/;
         }
         my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n" .
-            join("\n", @settings) .
-            (scalar(@settings) ? "\n" : "") .
+            $version . "\n" .
             "# END CODEX-AGENTS-INSTALLER";
         $config = $managed;
         if ($config =~ /^\[/m) {
+            $config =~ s/\n[ \t]*(?:\n[ \t]*)*(?=\[)/\n\n/m;
             $config =~ s/^(?=\[)/$block\n\n/m;
         } else {
             $config .= "\n" unless $config eq "" || $config =~ /\n\z/;
