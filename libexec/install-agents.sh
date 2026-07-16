@@ -135,6 +135,10 @@ apply_config_version() {
         my $version = <$version_fh>;
         my $managed = $config;
         $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//ms;
+        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*)\s*=/mg);
+        for my $setting (@settings) {
+            $managed =~ s/^\Q$setting\E\s*=.*(?:\r?\n|\z)//mg;
+        }
         my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n" .
             $version . "\n" .
             "# END CODEX-AGENTS-INSTALLER";
