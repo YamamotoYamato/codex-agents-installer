@@ -91,7 +91,7 @@ apply_config_version() {
     mkdir -p "$(dirname "$config_file")"
     [ -f "$config_file" ] || : > "$config_file"
     before_checksum=$(cksum "$config_file")
-    perl -e '
+    config_conflicts=$(perl -e '
         my ($config_file, $version_file) = @ARGV;
         local $/;
         open my $config_fh, "<:encoding(UTF-8)", $config_file or die $!;
@@ -109,12 +109,31 @@ apply_config_version() {
             /^([A-Za-z][A-Za-z0-9_-]*)\s*=/;
             $1;
         } @settings;
-        if (@conflicts && ($ENV{CODEX_AGENTS_CONFIG_OVERWRITE} // "") !~ /^(?i:yes|y)$/) {
-            print "管理対象外の config.toml に既存の設定があります: ", join(", ", @conflicts), "\n";
-            print "上書きしますか？ [y/N]: ";
-            my $answer = <STDIN> // "";
-            exit 1 unless $answer =~ /^(?i:\s*y(?:es)?\s*)$/;
-        }
+        print join("\n", @conflicts);
+        exit 0;
+    ' "$config_file" "$config_version_file")
+    if [ -n "$config_conflicts" ] && [ "${CODEX_AGENTS_CONFIG_OVERWRITE:-}" != "yes" ] && [ "${CODEX_AGENTS_CONFIG_OVERWRITE:-}" != "y" ]; then
+        echo "管理対象外の config.toml に既存の設定があります: $(printf '%s' "$config_conflicts" | paste -sd ', ' -)"
+        printf '上書きしますか？ [y/N]: '
+        read -r answer
+        case "$answer" in
+            y|Y|yes|YES)
+                ;;
+            *)
+                echo "config.toml の更新をスキップしました: $config_file"
+                return 0
+                ;;
+        esac
+    fi
+    perl -e '
+        my ($config_file, $version_file) = @ARGV;
+        local $/;
+        open my $config_fh, "<:encoding(UTF-8)", $config_file or die $!;
+        open my $version_fh, "<:encoding(UTF-8)", $version_file or die $!;
+        my $config = <$config_fh>;
+        my $version = <$version_fh>;
+        my $managed = $config;
+        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//ms;
         my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n" .
             $version . "\n" .
             "# END CODEX-AGENTS-INSTALLER";
