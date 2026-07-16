@@ -116,8 +116,9 @@ apply_config_version() {
         echo "管理対象外の config.toml に既存の設定があります: $(printf '%s' "$config_conflicts" | paste -sd ', ' -)"
         printf '上書きしますか？ [y/N]: '
         read -r answer
-        case "$answer" in
-            y|Y|yes|YES)
+        normalized_answer=$(printf '%s' "$answer" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+        case "$normalized_answer" in
+            y|yes)
                 ;;
             *)
                 echo "config.toml の更新をスキップしました: $config_file"
