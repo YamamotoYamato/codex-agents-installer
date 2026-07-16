@@ -99,16 +99,25 @@ apply_config_version() {
         my $config = <$config_fh>;
         my $version = <$version_fh>;
         my $managed = $config;
-        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//ms;
+        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//msg;
         $version =~ s/\s+\z//;
-        my $has_table = $version =~ /^\s*\[\[/m;
-        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*)\s*=\s*.+?\s*$/mg);
-        my @conflicts = $has_table ? () : grep {
-            $managed =~ /^\Q$_\E\s*=/m;
-        } map {
-            /^([A-Za-z][A-Za-z0-9_-]*)\s*=/;
-            $1;
-        } @settings;
+        sub setting_paths {
+            my ($text) = @_;
+            my $table = q{};
+            my @paths;
+            for my $line (split /(?<=\n)/, $text) {
+                if ($line =~ /^\s*(\[\[?[^\]]+\]\]?)\s*$/) {
+                    $table = $1;
+                    $table =~ s/^\[\[?\s*//;
+                    $table =~ s/\s*\]\]?\s*$//;
+                } elsif ($line =~ /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*=/) {
+                    push @paths, length($table) == 0 ? $1 : "$table.$1";
+                }
+            }
+            return @paths;
+        }
+        my %managed_paths = map { $_ => 1 } setting_paths($managed);
+        my @conflicts = grep { $managed_paths{$_} } setting_paths($version);
         print join("\n", @conflicts);
         exit 0;
     ' "$config_file" "$config_version_file")
@@ -134,21 +143,65 @@ apply_config_version() {
         my $config = <$config_fh>;
         my $version = <$version_fh>;
         my $managed = $config;
-        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//ms;
-        my @settings = ($version =~ /^([A-Za-z][A-Za-z0-9_-]*)\s*=/mg);
-        for my $setting (@settings) {
-            $managed =~ s/^\Q$setting\E\s*=.*(?:\r?\n|\z)//mg;
+        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//msg;
+        sub setting_paths {
+            my ($text) = @_;
+            my $table = q{};
+            my %paths;
+            for my $line (split /(?<=\n)/, $text) {
+                if ($line =~ /^\s*(\[\[?[^\]]+\]\]?)\s*$/) {
+                    $table = $1;
+                    $table =~ s/^\[\[?\s*//;
+                    $table =~ s/\s*\]\]?\s*$//;
+                } elsif ($line =~ /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*=/) {
+                    my $path = length($table) == 0 ? $1 : "$table.$1";
+                    $paths{$path} = 1;
+                }
+            }
+            return %paths;
         }
-        my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n" .
-            $version . "\n" .
-            "# END CODEX-AGENTS-INSTALLER";
+        my %settings = setting_paths($version);
+        my $table = q{};
+        my @lines;
+        for my $line (split /(?<=\n)/, $managed) {
+            if ($line =~ /^\s*(\[\[?[^\]]+\]\]?)\s*$/) {
+                $table = $1;
+                $table =~ s/^\[\[?\s*//;
+                $table =~ s/\s*\]\]?\s*$//;
+                push @lines, $line;
+            } elsif ($line =~ /^\s*([A-Za-z][A-Za-z0-9_-]*)\s*=/) {
+                my $path = length($table) == 0 ? $1 : "$table.$1";
+                push @lines, $line unless $settings{$path};
+            } else {
+                push @lines, $line;
+            }
+        }
+        $managed = join q{}, @lines;
         $config = $managed;
-        if ($config =~ /^\[/m) {
-            $config =~ s/\n[ \t]*(?:\n[ \t]*)*(?=\[)/\n\n/m;
-            $config =~ s/^(?=\[)/$block\n\n/m;
-        } else {
-            $config .= "\n" unless $config eq "" || $config =~ /\n\z/;
-            $config .= "$block\n";
+        my %sections;
+        my $current = q{};
+        for my $line (split /(?<=\n)/, $version) {
+            if ($line =~ /^\s*(\[\[?[^\]]+\]\]?)\s*$/) {
+                $current = $1;
+                $current =~ s/^\[\[?\s*//;
+                $current =~ s/\s*\]\]?\s*$//;
+                $sections{$current} .= $line;
+            } else {
+                $sections{$current} .= $line;
+            }
+        }
+        for my $section (keys %sections) {
+            my $body = $sections{$section};
+            $body =~ s/^\s*(\[\[?[^\]]+\]\]?)\s*\r?\n//;
+            my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n$body# END CODEX-AGENTS-INSTALLER\n";
+            if (length($section) == 0) {
+                $config = $block . "\n" . $config;
+            } elsif ($config =~ /^\[\Q$section\E\]\s*\r?\n/m) {
+                $config =~ s/^(\[\Q$section\E\]\s*\r?\n)/$1$block/m;
+            } else {
+                $config .= "\n" unless length($config) == 0 || $config =~ /\n\z/;
+                $config .= "[$section]\n$block\n";
+            }
         }
         open my $out_fh, ">:encoding(UTF-8)", $config_file or die $!;
         print {$out_fh} $config;

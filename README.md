@@ -71,7 +71,7 @@ Windows の PowerShell または `cmd.exe` では次でも確認できます。
 
 選択したディレクトリに既に `AGENTS.md` がある場合は、先に内容を表示します。最新版と一致する内容が既に含まれている場合は、何も変更せずにスキップします。
 
-選択したディレクトリ直下の `config.toml` には、`versions/` の番号付き TOML にあるトップレベル設定を、`CODEX-AGENTS-INSTALLER` のコメント付き管理ブロックとして反映します。現在は `versions/1.toml` により `model_context_window = 136000` を設定します。将来の変更は `versions/2.toml` のように追加します。新しいバージョンで項目を削除すると、管理ブロックからも削除されます。
+選択したディレクトリ直下の `config.toml` には、`versions/` の番号付き TOML にある設定を、`CODEX-AGENTS-INSTALLER` のコメント付き管理ブロックとして反映します。トップレベル設定だけでなく、`[notice]` などのテーブル配下の設定も更新できます。現在は `versions/1.toml` により `model_context_window = 136000` を設定します。将来の変更は `versions/2.toml` のように追加します。新しいバージョンで項目を削除すると、管理ブロックからも削除されます。
 
 管理ブロック外に同じ設定が既にある場合は、上書き前に確認します。自動実行時に上書きを許可する場合は `CODEX_AGENTS_CONFIG_OVERWRITE=yes` を指定します。
 
