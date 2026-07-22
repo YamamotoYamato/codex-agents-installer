@@ -98,8 +98,31 @@ apply_config_version() {
         open my $version_fh, "<:encoding(UTF-8)", $version_file or die $!;
         my $config = <$config_fh>;
         my $version = <$version_fh>;
-        my $managed = $config;
-        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//msg;
+        # 管理ブロックだけを安全に除去する
+        sub strip_managed_blocks {
+            my ($text) = @_;
+            my (@lines, @block);
+            for my $line (split /(?<=\n)/, $text) {
+                if (@block) {
+                    if ($line =~ /^# END CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                        @block = ();
+                    } elsif ($line =~ /^\s*\[\[?[^\]]+\]\]?\s*\r?\n$/) {
+                        push @lines, @block[1 .. $#block], $line;
+                        @block = ();
+                    } else {
+                        push @block, $line;
+                    }
+                } elsif ($line =~ /^# BEGIN CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                    @block = ($line);
+                } elsif ($line !~ /^# END CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                    push @lines, $line;
+                }
+            }
+            push @lines, @block[1 .. $#block] if @block;
+            return join q{}, @lines;
+        }
+        my $managed = strip_managed_blocks($config);
+        $managed =~ s/\A(?:[ \t]*\r?\n){2,}/\n/;
         $version =~ s/\s+\z//;
         sub setting_paths {
             my ($text) = @_;
@@ -142,8 +165,31 @@ apply_config_version() {
         open my $version_fh, "<:encoding(UTF-8)", $version_file or die $!;
         my $config = <$config_fh>;
         my $version = <$version_fh>;
-        my $managed = $config;
-        $managed =~ s/^# BEGIN CODEX-AGENTS-INSTALLER\r?\n.*?^# END CODEX-AGENTS-INSTALLER\r?\n?//msg;
+        # 管理ブロックだけを安全に除去する
+        sub strip_managed_blocks {
+            my ($text) = @_;
+            my (@lines, @block);
+            for my $line (split /(?<=\n)/, $text) {
+                if (@block) {
+                    if ($line =~ /^# END CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                        @block = ();
+                    } elsif ($line =~ /^\s*\[\[?[^\]]+\]\]?\s*\r?\n$/) {
+                        push @lines, @block[1 .. $#block], $line;
+                        @block = ();
+                    } else {
+                        push @block, $line;
+                    }
+                } elsif ($line =~ /^# BEGIN CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                    @block = ($line);
+                } elsif ($line !~ /^# END CODEX-AGENTS-INSTALLER\r?\n?$/) {
+                    push @lines, $line;
+                }
+            }
+            push @lines, @block[1 .. $#block] if @block;
+            return join q{}, @lines;
+        }
+        my $managed = strip_managed_blocks($config);
+        $managed =~ s/\A(?:[ \t]*\r?\n){2,}/\n/;
         sub setting_paths {
             my ($text) = @_;
             my $table = q{};
@@ -190,12 +236,14 @@ apply_config_version() {
                 $sections{$current} .= $line;
             }
         }
-        for my $section (keys %sections) {
+        for my $section (sort keys %sections) {
             my $body = $sections{$section};
             $body =~ s/^\s*(\[\[?[^\]]+\]\]?)\s*\r?\n//;
-            my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n$body# END CODEX-AGENTS-INSTALLER\n";
+            $body =~ s/\s+\z//;
+            my $block = "# BEGIN CODEX-AGENTS-INSTALLER\n$body\n# END CODEX-AGENTS-INSTALLER\n";
             if (length($section) == 0) {
-                $config = $block . "\n" . $config;
+                $config =~ s/\A(?:[ \t]*\r?\n)+//;
+                $config = $block . (length($config) == 0 ? q{} : "\n") . $config;
             } elsif ($config =~ /^\[\Q$section\E\]\s*\r?\n/m) {
                 $config =~ s/^(\[\Q$section\E\]\s*\r?\n)/$1$block/m;
             } else {
