@@ -81,6 +81,10 @@ Windows の PowerShell または `cmd.exe` では次でも確認できます。
 
 どのバージョンにも一致しない既存ファイルの場合は、上書きまたは追記を選択できます。この選択は Enter のみで上書きになります。
 
+## ライセンス
+
+Copyright and Related Rights waived under the [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) dedication. SPDX-License-Identifier: `CC0-1.0`
+
 ## テスト
 
 実際のホームディレクトリを触らずに試す場合は、`CODEX_AGENTS_HOME` に一時ディレクトリを指定できます。
